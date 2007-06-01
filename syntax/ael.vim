@@ -1,8 +1,8 @@
 " Vim syntax file
 " Language:	AEL (Asterisk Extension Language)
 " Maintainer:	C. Chad Wallace <cmdrwalrus@gmail.com>
-" Last Change:	2007 May 16
-" Version:	0.1
+" Last Change:	2007 June 1
+" Version:	0.2
 
 " Quit when a (custom) syntax file was already loaded
 if exists("b:current_syntax")
@@ -14,7 +14,8 @@ endif
 " globals block
 syn match	aelGlobalsKeyword	"\<globals\>" nextgroup=aelGlobalsBlock skipwhite
 syn region	aelGlobalsBlock		start="{" end="};" contained contains=aelGlobalVar,aelComment
-syn match	aelGlobalVar		"\<\h[0-9A-Za-z_-]*\ze=" contained nextgroup=aelExpression
+syn match	aelGlobalVar		"\<\h[0-9A-Za-z_-]*\ze=" contained nextgroup=aelGlobalVarExpression
+syn match	aelGlobalVarExpression	".*;" contained contains=aelInterpol,aelExpr,aelString
 
 
 " macro blocks
@@ -53,23 +54,27 @@ syn match	aelExtensionSingle	".*;" contained contains=@aelStatement,aelComment
 " Dialplan Statements (priorities)
 syn cluster	aelStatement		contains=aelSet,aelApplication,aelIf,aelElse,aelSwitch,aelGoto,aelMacroCall
 
-syn match	aelSet			"\<Set\s*(.*)\ze;" contained contains=aelSetVariable
-syn match	aelSetVariable		"\<\h\w*\((\h\w*)\)\=\ze=" contained nextgroup=aelExpression
-syn match 	aelApplication		"\<\h\w*(.*)\ze;" contained contains=aelApplicationData
-syn match	aelApplicationData	".*" contained
+syn match	aelSet			"\<Set\ze\s*(" contained nextgroup=aelSetOpenParen skipwhite
+syn match	aelSetOpenParen		"(" contained nextgroup=aelSetVariable skipwhite
+syn match	aelSetVariable		"\h\w*\((\h\w*)\)\=\ze=" contained nextgroup=aelSetExpression skipwhite
+syn match	aelSetExpression	".*\ze);" contained contains=aelInterpol,aelExpr,aelString
+
+syn match	aelApplication		"\<\(Set\)\@!\h\w*\ze\s*(" contained nextgroup=aelAppOpenParen skipwhite
+syn match	aelAppOpenParen		"(" contained nextgroup=aelAppExpression skipwhite
+syn match	aelAppExpression	".*\ze);" contained contains=aelInterpol,aelExpr,aelString
 
 syn match	aelIf			"\<if\>" contained nextgroup=aelIfCond skipwhite
-syn match	aelIfCond		"(.*)" contained nextgroup=aelIfBlock,aelIfElseBlock skipwhite
+syn match	aelIfCond		"(.*)" contained contains=aelInterpol,aelExpr,aelString,aelOperator nextgroup=aelIfBlock,aelIfElseBlock skipwhite
 syn region	aelIfBlock		start="{" end="};" contained contains=@aelStatement,aelLabel,aelComment
 syn region	aelIfElseBlock		start="{" end="}" contained contains=@aelStatement,aelLabel,aelComment nextgroup=aelElse skipwhite skipnl
 syn match	aelElse			"\<else\>" contained nextgroup=aelElseBlock skipwhite
 syn region	aelElseBlock		start="{" end="};" contained contains=@aelStatement,aelLabel,aelComment
 
 syn match	aelSwitch		"\<switch\>" contained nextgroup=aelSwitchCond skipwhite
-syn match	aelSwitchCond		"(.*)" contained nextgroup=aelSwitchBlock skipwhite
+syn match	aelSwitchCond		"(.*)" contained contains=aelInterpol,aelExpr,aelString nextgroup=aelSwitchBlock skipwhite
 syn region	aelSwitchBlock		start="{" end="};" contained contains=@aelStatement,aelSwitchBreak,aelSwitchCase,aelSwitchDefault,aelComment
 syn match	aelSwitchCase		"\<case\>" contained nextgroup=aelSwitchCaseVal skipwhite
-syn match	aelSwitchCaseVal	"\s*\zs.*\ze:" contained
+syn match	aelSwitchCaseVal	"\s*\zs.*\ze:" contained contains=aelInterpol,aelExpr
 syn match	aelSwitchDefault	"\<default\ze:" contained
 syn keyword	aelSwitchBreak		break contained
 
@@ -79,13 +84,16 @@ syn match	aelGotoPipe		"|" contained
 
 syn match	aelMacroCall		"&\h[0-9A-Za-z_-]*\>" contained nextgroup=aelMacroCallParms
 syn match	aelMacroCallParms	"(\(.*\(,.*\)*\)\=)" contained contains=aelMacroCallParm
-syn match	aelMacroCallParm	".*" contained contains=aelExpression
+syn match	aelMacroCallParm	".*" contained contains=aelInterpol,aelString,aelExpr
 
 
 " Generic
 syn match	aelLabel		"\<\h[0-9A-Za-z_-]*\ze:" contained
 syn match	aelComment		"//.*"
-syn region	aelString		start=/"/ skip=/\\"/ end=/"/
+syn region	aelString		start=/"/ skip=/\\"/ end=/"/ contained contains=aelInterpol,aelExpr
+syn region	aelInterpol		matchgroup=aelOperator start="${" end="}" contained contains=aelInterpol,aelExpr
+syn region	aelExpr			matchgroup=aelOperator start="$\[" end="\]" contained contains=aelInterpol,aelString,aelOperator
+syn match	aelOperator		"[<>=%!^&|+*/-]" contained
 
 
 " Synchronization
@@ -116,11 +124,13 @@ hi def link 	aelIgnorepat		aelKeyword
 hi def link 	aelGlobalsKeyword	aelKeyword
 hi def link 	aelMacroKeyword		aelKeyword
 hi def link 	aelContextKeyword	aelKeyword
+hi def link	aelSwitchBreak		aelKeyword
 hi def link 	aelKeyword		Keyword
 
 hi def link	aelIgnorepatNeck	Operator
 hi def link	aelExtensionNeck	Operator
 hi def link	aelGotoPipe		Operator
+hi def link	aelOperator		Operator
 
 " Literals
 hi def link	aelSwitchCaseVal	String
@@ -135,10 +145,13 @@ hi def link 	aelGlobalVar		aelIdentifier
 hi def link	aelContextName		aelIdentifier
 hi def link	aelMacroParm		aelIdentifier
 hi def link	aelSetVariable		aelIdentifier
+hi def link	aelInterpol		aelIdentifier
 hi def link 	aelIdentifier		Identifier
-hi def link	aelMacroCall		Function
-hi def link	aelMacroName		Function
-hi def link 	aelSet			Function
+hi def link	aelMacroCall		aelFunction
+hi def link	aelMacroName		aelFunction
+hi def link 	aelApplication		aelFunction
+hi def link 	aelSet			aelFunction
+hi def link 	aelFunction		Function
 
 hi def link 	aelComment		Comment
 
